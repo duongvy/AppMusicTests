@@ -1,8 +1,10 @@
 package com.example.appmusic;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.Button;
@@ -16,6 +18,7 @@ import com.example.appmusic.api.ApiClient;
 import com.example.appmusic.api.Login.UserRequest;
 import com.example.appmusic.api.Login.UserResponse;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import retrofit2.Call;
@@ -28,8 +31,6 @@ public class Login extends AppCompatActivity {
     EditText email, password;
     Button btnLogin;
 
-    SessionManager sessionManager;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -37,7 +38,15 @@ public class Login extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        sessionManager = new SessionManager(this);
+        SharedPreferences prefs = getSharedPreferences("auth", MODE_PRIVATE);
+        String token = prefs.getString("token", null);
+        if(token != null){
+
+            ApiClient apiClient = new ApiClient();
+            apiClient.setToken(token);
+            Intent intent = new Intent(Login.this, AccountPage.class);
+            startActivity(intent);
+        }
 
         email = findViewById(R.id.editTextEmail);
         password = findViewById(R.id.editTextPassword);
@@ -87,7 +96,6 @@ public class Login extends AppCompatActivity {
     }
 
     private void login() {
-
         UserRequest userRequest = new UserRequest();
         userRequest.setAccount(email.getText().toString());
         userRequest.setPassword(password.getText().toString());
@@ -101,26 +109,39 @@ public class Login extends AppCompatActivity {
                     UserResponse userResponse = response.body();
                     String token = userResponse.getData().getAccess_token();
 
-                    // Tạo session cho user khi login thành công
-                    SessionManager sessionManager = new SessionManager(Login.this);
-                    sessionManager.createSession(token);
+                    // luu token
+                    SharedPreferences.Editor editor = getSharedPreferences("auth", MODE_PRIVATE).edit();
+                    editor.putString("token", token);
+                    editor.apply();
+
+                    ApiClient apiClient = new ApiClient();
+                    apiClient.setToken(token);
 
                     Toast.makeText(Login.this, "Login Successfully!", Toast.LENGTH_LONG).show();
-                    startActivity(new Intent(getApplicationContext(), Home.class).putExtra("data", token));
+                    startActivity(new Intent(Login.this, AlbumPage.class));
                 }else{
                     try {
                         // Chuyển error thành đối tượng để lấy message lỗi
                         JSONObject jsonObject = new JSONObject(response.errorBody().string());
-                        Toast.makeText(Login.this, jsonObject.getJSONObject("error").getString("message"), Toast.LENGTH_LONG).show();
+                        JSONObject jsonObjectErrors = jsonObject.getJSONObject("error");
+                        JSONArray jsonArray =  jsonObjectErrors.getJSONArray("message");
+
+                        for(int i=0; i<jsonArray.length(); i++){
+                            String strErrorMessage = jsonArray.getString(i);
+                            Toast.makeText(Login.this, strErrorMessage, Toast.LENGTH_LONG).show();
+                        }
+
+//                        JSONObject jsonObject = new JSONObject(response.errorBody().string());
+//                        Toast.makeText(Login.this, jsonObject.getJSONObject("error").getString("message"), Toast.LENGTH_LONG).show();
                     }catch (Exception e){
-                        Toast.makeText(Login.this, e.getMessage(), Toast.LENGTH_LONG).show();
+                        Toast.makeText(Login.this,"Login Failed! Email does not exist", Toast.LENGTH_LONG).show();
                     }
                 }
             }
 
             @Override
             public void onFailure(Call<UserResponse> call, Throwable t) {
-                Toast.makeText(Login.this, "Login Failed! "+t.getLocalizedMessage(), Toast.LENGTH_LONG).show();
+                Toast.makeText(Login.this, "Login Failed! "+ t.getLocalizedMessage(), Toast.LENGTH_LONG).show();
             }
         });
     }

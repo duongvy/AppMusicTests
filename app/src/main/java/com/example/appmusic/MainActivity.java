@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             private void doSkip() {
-                Intent intent = new Intent(MainActivity.this, Login.class);
+                Intent intent = new Intent(MainActivity.this, AccountPage.class);
                 startActivity(intent);
             }
         });
